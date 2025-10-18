@@ -4,6 +4,8 @@
 
 [build.environment]
   # Increase Node heap during Netlify builds
-  NODE_OPTIONS = "--max-old-space-size=4096"
+  # Preload tiny shims to provide minimal browser globals (File/Blob/FormData)
+  # and increase Node heap during Netlify builds.
+  NODE_OPTIONS = "--max-old-space-size=4096 --require=./scripts/node-shims.js"
   # Ensure Netlify uses a Node version compatible with package.json engines
   NODE_VERSION = "18.18.0"
