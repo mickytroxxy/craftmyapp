@@ -113,7 +113,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
                 modelList={props.modelList}
                 provider={props.provider}
                 setProvider={props.setProvider}
-                providerList={props.providerList || (PROVIDER_LIST as ProviderInfo[])}
+                providerList={props.providerList || (PROVIDER_LIST as unknown as ProviderInfo[])}
                 apiKeys={props.apiKeys}
                 modelLoading={props.isModelLoading}
               />

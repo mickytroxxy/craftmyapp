@@ -188,8 +188,10 @@ export class MCPService {
   private async _createSSEClient(serverName: string, config: SSEServerConfig): Promise<MCPClient> {
     logger.debug(`Creating SSE client for ${serverName} with URL: ${config.url}`);
 
+    // Cast validated config to the expected transport shape for the library
+    const transportConfig = config as unknown as { type: 'sse'; url: string; headers?: Record<string, string> };
     const client = await experimental_createMCPClient({
-      transport: config,
+      transport: transportConfig,
     });
 
     return Object.assign(client, { serverName });
@@ -200,7 +202,16 @@ export class MCPService {
       `Creating STDIO client for '${serverName}' with command: '${config.command}' ${config.args?.join(' ') || ''}`,
     );
 
-    const client = await experimental_createMCPClient({ transport: new Experimental_StdioMCPTransport(config) });
+    // Experimental_StdioMCPTransport expects a STDIOServerConfig shape; ensure the config matches
+    const stdioConfig = config as unknown as STDIOServerConfig;
+
+    if (!stdioConfig.command) {
+      throw new Error(`Invalid stdio server config for '${serverName}': missing command`);
+    }
+
+    const client = await experimental_createMCPClient({
+      transport: new Experimental_StdioMCPTransport(stdioConfig as unknown as any),
+    });
 
     return Object.assign(client, { serverName });
   }
