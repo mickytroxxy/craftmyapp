@@ -10,3 +10,6 @@
   # Pin a Netlify Node version known to play nicely with native deps (esbuild/workerd).
   # Using a concrete recent 18.x LTS avoids odd Node 20.x patch incompatibilities in some packages.
   NODE_VERSION = "18.20.2"
+  # Preload the project shim by absolute path since some install-time child processes
+  # change cwd when running postinstall hooks; absolute path ensures the file is found.
+  NODE_OPTIONS = "--max-old-space-size=4096 --require=/opt/build/repo/scripts/node-shims.cjs"
