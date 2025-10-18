@@ -1,0 +1,9 @@
+[build]
+  command = "pnpm run build:netlify"
+  publish = "build/client"
+
+[build.environment]
+  # Increase Node heap during Netlify builds
+  NODE_OPTIONS = "--max-old-space-size=4096"
+  # Ensure Netlify uses a Node version compatible with package.json engines
+  NODE_VERSION = "18.18.0"

@@ -4,7 +4,8 @@ import { workbenchStore } from '~/lib/stores/workbench';
 import type { FileMap } from '~/lib/stores/files';
 import type { EditorDocument } from '~/components/editor/codemirror/CodeMirrorEditor';
 import { diffLines, type Change } from 'diff';
-import { getHighlighter } from 'shiki';
+
+// Shiki will be dynamically imported to avoid large memory usage during build
 import '~/styles/diff-view.css';
 import { diffFiles, extractRelativePath } from '~/utils/diff';
 import type { FileHistory } from '~/types/actions';
@@ -554,34 +555,28 @@ const getSharedHighlighter = async () => {
     return highlighterPromise;
   }
 
-  highlighterPromise = getHighlighter({
-    themes: ['github-dark', 'github-light'],
-    langs: [
-      'typescript',
-      'javascript',
-      'json',
-      'html',
-      'css',
-      'jsx',
-      'tsx',
-      'python',
-      'php',
-      'java',
-      'c',
-      'cpp',
-      'csharp',
-      'go',
-      'ruby',
-      'rust',
-      'plaintext',
-    ],
-  });
+  highlighterPromise = (async () => {
+    const shiki = await import('shiki');
+    const getHighlighter = (shiki as any).getHighlighter ?? (shiki as any).createHighlighter ?? undefined;
 
-  highlighterInstance = await highlighterPromise;
-  highlighterPromise = null;
+    if (!getHighlighter) {
+      // shiki v1 export differences; try fallback
+      throw new Error('Shiki getHighlighter/createHighlighter not available');
+    }
 
-  // Clear the promise once resolved
-  return highlighterInstance;
+    // Limit bundled languages to a small core set to avoid huge build-time bundles
+    const instance = await getHighlighter({
+      themes: ['github-dark', 'github-light'],
+      langs: ['typescript', 'javascript', 'json', 'html', 'css', 'python', 'plaintext', 'shell', 'tsx', 'jsx'],
+    });
+
+    highlighterInstance = instance;
+    highlighterPromise = null;
+
+    return highlighterInstance;
+  })();
+
+  return highlighterPromise;
 };
 
 const InlineDiffComparison = memo(({ beforeCode, afterCode, filename, language }: CodeComparisonProps) => {

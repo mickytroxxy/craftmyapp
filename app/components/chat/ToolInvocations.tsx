@@ -1,7 +1,7 @@
 import type { ToolInvocationUIPart } from '@ai-sdk/ui-utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useMemo, useState, useEffect } from 'react';
-import { createHighlighter, type BundledLanguage, type BundledTheme, type HighlighterGeneric } from 'shiki';
+import type { BundledLanguage, BundledTheme, HighlighterGeneric } from 'shiki';
 import { classNames } from '~/utils/classNames';
 import {
   TOOL_EXECUTION_APPROVAL,
@@ -20,11 +20,32 @@ const highlighterOptions = {
   themes: ['light-plus', 'dark-plus'],
 };
 
-const jsonHighlighter: HighlighterGeneric<BundledLanguage, BundledTheme> =
-  import.meta.hot?.data.jsonHighlighter ?? (await createHighlighter(highlighterOptions));
+let jsonHighlighter: HighlighterGeneric<BundledLanguage, BundledTheme> | null =
+  import.meta.hot?.data.jsonHighlighter ?? null;
 
-if (import.meta.hot) {
-  import.meta.hot.data.jsonHighlighter = jsonHighlighter;
+async function ensureJsonHighlighter() {
+  if (jsonHighlighter) {
+    return jsonHighlighter;
+  }
+
+  if (typeof window !== 'undefined' && (window as any).__jsonHighlighter) {
+    jsonHighlighter = (window as any).__jsonHighlighter;
+    return jsonHighlighter;
+  }
+
+  const shiki = await import('shiki');
+  const h = await (shiki as any).createHighlighter(highlighterOptions);
+  jsonHighlighter = h;
+
+  if (import.meta.hot) {
+    import.meta.hot.data.jsonHighlighter = jsonHighlighter;
+  }
+
+  if (typeof window !== 'undefined') {
+    (window as any).__jsonHighlighter = jsonHighlighter;
+  }
+
+  return jsonHighlighter;
 }
 
 interface JsonCodeBlockProps {
@@ -53,20 +74,39 @@ function JsonCodeBlock({ className, code, theme }: JsonCodeBlockProps) {
     logger.error('Failed to parse JSON', { error: e });
   }
 
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    ensureJsonHighlighter()
+      .then((h) => {
+        if (!mounted || !h) {
+          return;
+        }
+
+        setHtml(h.codeToHtml(formattedCode, { lang: 'json', theme: theme === 'dark' ? 'dark-plus' : 'light-plus' }));
+      })
+      .catch(() => {
+        if (!mounted) {
+          return;
+        }
+
+        setHtml(`<pre>${formattedCode}</pre>`);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [formattedCode, theme]);
+
   return (
     <div
       className={classNames('text-xs rounded-md overflow-hidden mcp-tool-invocation-code', className)}
-      dangerouslySetInnerHTML={{
-        __html: jsonHighlighter.codeToHtml(formattedCode, {
-          lang: 'json',
-          theme: theme === 'dark' ? 'dark-plus' : 'light-plus',
-        }),
-      }}
-      style={{
-        padding: '0',
-        margin: '0',
-      }}
-    ></div>
+      style={{ padding: '0', margin: '0' }}
+    >
+      {html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <pre>{formattedCode}</pre>}
+    </div>
   );
 }
 

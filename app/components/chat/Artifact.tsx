@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { computed } from 'nanostores';
 import { memo, useEffect, useRef, useState } from 'react';
-import { createHighlighter, type BundledLanguage, type BundledTheme, type HighlighterGeneric } from 'shiki';
+import type { BundledLanguage, BundledTheme, HighlighterGeneric } from 'shiki';
 import type { ActionState } from '~/lib/runtime/action-runner';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
@@ -13,13 +13,6 @@ const highlighterOptions = {
   langs: ['shell'],
   themes: ['light-plus', 'dark-plus'],
 };
-
-const shellHighlighter: HighlighterGeneric<BundledLanguage, BundledTheme> =
-  import.meta.hot?.data.shellHighlighter ?? (await createHighlighter(highlighterOptions));
-
-if (import.meta.hot) {
-  import.meta.hot.data.shellHighlighter = shellHighlighter;
-}
 
 interface ArtifactProps {
   messageId: string;
@@ -163,17 +156,70 @@ interface ShellCodeBlockProps {
 }
 
 function ShellCodeBlock({ classsName, code }: ShellCodeBlockProps) {
-  return (
-    <div
-      className={classNames('text-xs', classsName)}
-      dangerouslySetInnerHTML={{
-        __html: shellHighlighter.codeToHtml(code, {
-          lang: 'shell',
-          theme: 'dark-plus',
-        }),
-      }}
-    ></div>
-  );
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    /*
+     * If running on server, skip — return an empty cleanup so the effect's
+     * return type is consistent with the cleanup function returned below.
+     */
+    if (typeof window === 'undefined') {
+      return () => {
+        /* noop cleanup on server */
+      };
+    }
+
+    // Try to reuse cached highlighter on window to avoid recreating it
+    const cached = (window as any).__shellHighlighter;
+
+    const ensureHighlighter = async () => {
+      try {
+        if (cached) {
+          const h = cached as HighlighterGeneric<BundledLanguage, BundledTheme>;
+
+          if (mounted) {
+            setHtml(h.codeToHtml(code, { lang: 'shell', theme: 'dark-plus' }));
+          }
+        } else {
+          const shiki = await import('shiki');
+          const h = await (shiki as any).createHighlighter(highlighterOptions);
+          (window as any).__shellHighlighter = h;
+
+          if (mounted) {
+            setHtml(h.codeToHtml(code, { lang: 'shell', theme: 'dark-plus' }));
+          }
+        }
+      } catch {
+        // If shiki fails, fall back to plain-escaped code
+        if (mounted) {
+          setHtml(`<pre>${escapeHtml(code)}</pre>`);
+        }
+      }
+    };
+
+    ensureHighlighter();
+
+    return () => {
+      mounted = false;
+    };
+  }, [code]);
+
+  if (!html) {
+    return <pre className={classNames('text-xs', classsName)}>{code}</pre>;
+  }
+
+  return <div className={classNames('text-xs', classsName)} dangerouslySetInnerHTML={{ __html: html }}></div>;
+}
+
+function escapeHtml(unsafe: string) {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 interface ActionListProps {
