@@ -10,3 +10,8 @@
   # Pin a Netlify Node version known to play nicely with native deps (esbuild/workerd).
   # Using a concrete recent 18.x LTS avoids odd Node 20.x patch incompatibilities in some packages.
   NODE_VERSION = "18.20.2"
+
+  [[redirects]]
+    from = "/*"
+    to = "/index.html"
+    status = 200
