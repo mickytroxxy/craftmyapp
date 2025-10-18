@@ -7,5 +7,5 @@
   # Preload tiny shims to provide minimal browser globals (File/Blob/FormData)
   # and increase Node heap during Netlify builds.
   NODE_OPTIONS = "--max-old-space-size=4096 --require=./scripts/node-shims.cjs"
-  # Ensure Netlify uses a Node version compatible with package.json engines
-  NODE_VERSION = "18.18.0"
+  # Ensure Netlify uses a Node version supported by Netlify. Use major version 20 to select Node 20.x
+  NODE_VERSION = "20"
